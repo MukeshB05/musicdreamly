@@ -322,15 +322,26 @@ export const fetchAlbumByID = async (
     albumId,
     limit = DEFAULT_LIMIT
 ) => {
+    const id = String(albumId ?? "").trim();
 
-    if (!albumId) {
+    if (!id) {
         throw new Error("Album ID is required");
     }
 
-    return apiRequest("albums", {
-        id: albumId,
-        limit: limit
-    });
+    // The Dreamly5 API's primary album-detail format is /api/albums?id=ID.
+    // Some deployments expose the REST-style /api/albums/ID route instead,
+    // so try that only when the primary route fails.
+    try {
+        return await apiRequest("albums", { id, limit });
+    } catch (primaryError) {
+        try {
+            return await apiRequest(`albums/${encodeURIComponent(id)}`, { limit });
+        } catch (fallbackError) {
+            throw new Error(
+                `Unable to load album ${id}. The API request failed for both album-detail routes. ${fallbackError?.message || primaryError?.message || "Please try again."}`
+            );
+        }
+    }
 };
 
 
