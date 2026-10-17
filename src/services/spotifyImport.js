@@ -10,7 +10,7 @@ const SPOTIFY_API =
   "https://api.spotify.com/v1";
 
 const JIOSAAVN_API =
-  "https://jiosaavndev.vercel.app/api";
+  "https://dreamly5api.vercel.app/api";
 
 const TOKEN_KEY =
   "spotify_access_token";
