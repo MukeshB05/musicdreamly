@@ -145,7 +145,7 @@ function Playlist() {
       const query = encodeURIComponent(genre.toLowerCase());
 
       const response = await fetch(
-        `https://jiosaavndev.vercel.app/api/search/playlists?query=${query}&limit=130`
+        `https://dreamly5api.vercel.app/api/search/playlists?query=${query}&limit=130`
       );
 
       if (!response.ok) {
