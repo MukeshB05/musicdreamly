@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 const ALLOWED_HOSTS = [
   "saavncdn.com",
   "jiosaavn.com",
-  "jiosaavndev.vercel.app",
+  "dreamly5api.vercel.app",
   "aac.saavncdn.com",
   "scdn.co",
 ];
