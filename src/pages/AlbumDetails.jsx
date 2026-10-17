@@ -12,7 +12,9 @@ import SongsList from "../components/SongsList";
 import Footer from "../components/footer";
 import Navigator from "../components/Navigator";
 import SongGrid from "../components/SongGrid";
-import { fetchAlbumByID, getSuggestionSong } from "../../fetch";
+import AlbumItems from "../components/Items/AlbumItems";
+import ArtistItems from "../components/Items/ArtistItems";
+import { fetchAlbumByID, getSuggestionSong, searchAlbumByQuery, getArtistbyQuery, getSongbyQuery } from "../../fetch";
 
 const safeArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -78,11 +80,60 @@ const readLikedAlbums = () => {
   }
 };
 
+const normalizeItems = (items) => {
+  const seen = new Set();
+  return safeArray(items).filter((item) => {
+    const itemId = item?.id ?? item?.albumId ?? item?.artistId ?? item?.name;
+    if (itemId == null) return false;
+    const key = String(itemId);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const RelatedAlbumSection = ({ title, items }) => {
+  const list = normalizeItems(items);
+  if (!list.length) return null;
+  return (
+    <section className="w-full">
+      <h2 className="mb-4 text-xl font-semibold">{title}</h2>
+      <div className="flex gap-3 overflow-x-auto scroll-smooth scroll-hide pb-2">
+        {list.map((item, index) => (
+          <div className="w-[9.5rem] shrink-0" key={item?.id || item?.albumId || `${title}-${index}`}>
+            <AlbumItems {...item} id={item?.id || item?.albumId} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const RelatedArtistSection = ({ title, items }) => {
+  const list = normalizeItems(items);
+  if (!list.length) return null;
+  return (
+    <section className="w-full">
+      <h2 className="mb-4 text-xl font-semibold">{title}</h2>
+      <div className="flex gap-3 overflow-x-auto scroll-smooth scroll-hide pb-2">
+        {list.map((item, index) => (
+          <div className="w-28 shrink-0" key={item?.id || item?.artistId || `${title}-${index}`}>
+            <ArtistItems {...item} id={item?.id || item?.artistId} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 const AlbumDetail = () => {
   const { id } = useParams();
   const [album, setAlbum] = useState(null);
   const [songs, setSongs] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
+  const [trendingAlbums, setTrendingAlbums] = useState([]);
+  const [sameYearAlbums, setSameYearAlbums] = useState([]);
+  const [relatedArtists, setRelatedArtists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [likedAlbums, setLikedAlbums] = useState(readLikedAlbums);
@@ -96,6 +147,9 @@ const AlbumDetail = () => {
       setAlbum(null);
       setSongs([]);
       setSuggestions([]);
+      setTrendingAlbums([]);
+      setSameYearAlbums([]);
+      setRelatedArtists([]);
 
       if (!id) {
         setError("Album ID is missing from the URL.");
@@ -115,26 +169,77 @@ const AlbumDetail = () => {
         setAlbum({ ...data, songs: albumSongs });
         setSongs(albumSongs);
 
-        // Suggestions are optional. An error here must not break the album page.
+        // Load each optional section independently; failures do not break the album page.
         const firstSongId = albumSongs[0]?.id || albumSongs[0]?.songId || albumSongs[0]?.song_id;
-        if (firstSongId) {
+        const albumArtistName =
+          data?.artists?.primary?.[0]?.name ||
+          data?.artists?.all?.[0]?.name ||
+          data?.artist?.name ||
+          (Array.isArray(data?.artists) ? data.artists[0]?.name : "") ||
+          "";
+
+        const readList = (response) => {
+          const value = unwrap(response);
+          if (Array.isArray(value)) return value;
+          return safeArray(
+            value?.albums || value?.artists || value?.songs ||
+            value?.results || value?.items ||
+            value?.data?.albums || value?.data?.artists || value?.data?.songs
+          );
+        };
+        const optionalRequest = async (request, query) => {
           try {
-            const suggestionResponse = await getSuggestionSong(firstSongId);
-            const suggestionData = unwrap(suggestionResponse);
-            const list = Array.isArray(suggestionData)
-              ? suggestionData
-              : safeArray(suggestionData?.songs || suggestionData?.results || suggestionData?.items);
-            const albumIds = new Set(albumSongs.map((song) => String(song?.id ?? song?.songId ?? "")));
-            if (active) {
-              setSuggestions(list.filter((song) => {
-                const songId = song?.id ?? song?.songId ?? song?.song_id;
-                return songId != null && !albumIds.has(String(songId));
-              }));
-            }
-          } catch (suggestionError) {
-            console.warn("Album suggestions unavailable:", suggestionError);
+            return readList(await request(query));
+          } catch (requestError) {
+            console.warn("Optional album section unavailable:", requestError);
+            return [];
           }
+        };
+
+        const jobs = [];
+        if (firstSongId) {
+          jobs.push(optionalRequest(getSuggestionSong, firstSongId).then((list) => {
+            const albumIds = new Set(albumSongs.map((song) => String(song?.id ?? song?.songId ?? song?.song_id ?? "")));
+            const filtered = list.filter((song) => {
+              const songId = song?.id ?? song?.songId ?? song?.song_id;
+              return songId != null && !albumIds.has(String(songId));
+            });
+            if (active) setSuggestions(filtered);
+          }));
+        } else if (albumArtistName) {
+          jobs.push(optionalRequest(getSongbyQuery, albumArtistName).then((list) => {
+            if (active) setSuggestions(list);
+          }));
         }
+
+        // The supplied API helper exposes search endpoints, so use them for
+        // discovery when dedicated trending/year endpoints are not available.
+        jobs.push(optionalRequest(searchAlbumByQuery, "trending").then((list) => {
+          const currentId = String(data?.id ?? data?.albumId ?? id);
+          if (active) setTrendingAlbums(list.filter((item) =>
+            String(item?.id ?? item?.albumId ?? "") !== currentId
+          ).slice(0, 12));
+        }));
+
+        const year = String(data?.year || data?.releaseDate || "").slice(0, 4);
+        if (year && /^\\d{4}$/.test(year)) {
+          jobs.push(optionalRequest(searchAlbumByQuery, year).then((list) => {
+            const currentId = String(data?.id ?? data?.albumId ?? id);
+            const filtered = list.filter((item) => {
+              const itemId = String(item?.id ?? item?.albumId ?? "");
+              const itemYear = String(item?.year || item?.releaseDate || "").slice(0, 4);
+              return itemId !== currentId && (!itemYear || itemYear === year);
+            });
+            if (active) setSameYearAlbums(filtered.slice(0, 12));
+          }));
+        }
+
+        if (albumArtistName) {
+          jobs.push(optionalRequest(getArtistbyQuery, albumArtistName).then((list) => {
+            if (active) setRelatedArtists(list.slice(0, 12));
+          }));
+        }
+        await Promise.allSettled(jobs);
       } catch (fetchError) {
         console.error("Unable to load album:", fetchError);
         if (active) setError(fetchError?.message || "Unable to load this album. Please try again.");
@@ -252,9 +357,9 @@ const AlbumDetail = () => {
           )}
         </section>
 
-        {suggestions.length > 0 && (
-          <section className="mb-6 w-full">
-            <h2 className="mb-4 text-xl font-semibold">You Might Like</h2>
+        <section className="mb-6 w-full">
+          <h2 className="mb-4 text-xl font-semibold">You Might Like</h2>
+          {suggestions.length > 0 ? (
             <div className="flex w-full items-center gap-2">
               <button type="button" aria-label="Scroll recommendations left" onClick={() => scroll(-700)} className="hidden h-24 shrink-0 items-center justify-center lg:flex"><MdOutlineKeyboardArrowLeft className="text-3xl" /></button>
               <div ref={scrollRef} className="grid w-full grid-flow-col grid-rows-1 items-center justify-start gap-3 overflow-x-auto scroll-smooth scroll-hide">
@@ -262,8 +367,14 @@ const AlbumDetail = () => {
               </div>
               <button type="button" aria-label="Scroll recommendations right" onClick={() => scroll(700)} className="hidden h-24 shrink-0 items-center justify-center lg:flex"><MdOutlineKeyboardArrowRight className="text-3xl" /></button>
             </div>
-          </section>
-        )}
+          ) : (
+            <p className="rounded-xl border border-current/10 p-4 text-sm opacity-70">No recommendations are available for this album right now.</p>
+          )}
+        </section>
+
+        <RelatedAlbumSection title="Currently Trending Albums" items={trendingAlbums} />
+        <RelatedAlbumSection title="Top Albums from Same Year" items={sameYearAlbums} />
+        <RelatedArtistSection title="Artists" items={relatedArtists} />
       </main>
       <Navigator />
       <Footer />
