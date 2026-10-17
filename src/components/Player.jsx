@@ -633,21 +633,32 @@ const getImage = (
 ========================================================= */
 
 const extractSuggestionList = (response) => {
-  const candidates = [
-    response,
-    response?.data,
-    response?.results,
-    response?.songs,
-    response?.data?.results,
-    response?.data?.songs,
-    response?.data?.data,
-    response?.data?.data?.results,
-    response?.data?.data?.songs,
+  // Saavn proxies return suggestion lists in several different envelopes.
+  // Walk common response containers instead of assuming a fixed response shape.
+  const queue = [response];
+  const visited = new Set();
+  const preferredKeys = [
+    "songs", "results", "data", "suggestions", "items", "tracks", "playlist",
   ];
 
-  for (const candidate of candidates) {
+  while (queue.length) {
+    const candidate = queue.shift();
+    if (!candidate || typeof candidate !== "object" || visited.has(candidate)) continue;
+    visited.add(candidate);
+
     if (Array.isArray(candidate)) {
-      return candidate.filter((item) => item && typeof item === "object");
+      const songLike = candidate.filter((item) => item && typeof item === "object");
+      if (songLike.length && songLike.some((item) =>
+        item.id || item.songId || item.song_id || item.name || item.title || item.song
+      )) {
+        return songLike.map((item) => item.song && typeof item.song === "object" ? item.song : item);
+      }
+      for (const item of candidate) queue.push(item);
+      continue;
+    }
+
+    for (const key of preferredKeys) {
+      if (candidate[key] && typeof candidate[key] === "object") queue.push(candidate[key]);
     }
   }
 
@@ -784,6 +795,10 @@ const Player = () => {
 
   const [isDownloading, setIsDownloading] =
     useState(false);
+
+  // Tracks which format is active so only that button animates.
+  const [activeDownloadFormat, setActiveDownloadFormat] =
+    useState(null);
 
   const [downloadProgress, setDownloadProgress] =
     useState(0);
@@ -1257,6 +1272,8 @@ const Player = () => {
     }
 
     let cancelled = false;
+    setSuggestions([]);
+    setDetail(null);
 
     const loadData = async () => {
       try {
@@ -2032,6 +2049,7 @@ const Player = () => {
       );
     };
 
+    setActiveDownloadFormat(format);
     setDownloadError("");
     setDownloadProgress(0);
     setDownloadBytes(0);
@@ -2220,6 +2238,7 @@ const Player = () => {
       setDownloadEta(0);
     } finally {
       setIsDownloading(false);
+      setActiveDownloadFormat(null);
     }
   };
 
@@ -2232,11 +2251,23 @@ const Player = () => {
   }
 
   const suggestionList =
-    Array.isArray(
-      suggestions
-    )
+    Array.isArray(suggestions)
       ? suggestions
       : [];
+
+  const scrollSuggestions = (direction) => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const firstCard = container.querySelector("[data-suggestion-card]");
+    const cardWidth = firstCard?.getBoundingClientRect()?.width || 160;
+    const distance = Math.max(cardWidth * 2, container.clientWidth * 0.8, 220);
+
+    container.scrollBy({
+      left: direction * distance,
+      behavior: "smooth",
+    });
+  };
 
   const hasSyncedLyrics =
     Boolean(
@@ -3326,9 +3357,9 @@ const Player = () => {
                     type="button"
                     onClick={() => handleDownload("flac")}
                     disabled={isDownloading}
-                    title={isDownloading ? `Downloading FLAC: ${Math.round(downloadProgress)}%` : "Download FLAC Hi-Res audio"}
+                    title={activeDownloadFormat === "flac" ? `Downloading FLAC: ${Math.round(downloadProgress)}%` : "Download FLAC Hi-Res audio"}
                     aria-label="Download FLAC audio"
-                    className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:h-11 sm:w-11 transition-all hover:scale-105 hover:ring-2 hover:ring-yellow-400 disabled:cursor-not-allowed disabled:opacity-50 ${isDownloading ? "animate-pulse ring-2 ring-yellow-400" : ""}`}
+                    className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:h-11 sm:w-11 transition-all hover:scale-105 hover:ring-2 hover:ring-yellow-400 disabled:cursor-not-allowed disabled:opacity-50 ${activeDownloadFormat === "flac" ? "animate-pulse ring-2 ring-yellow-400" : ""}`}
                   >
                     <img
                       src="/download-icons/flac-download.png"
@@ -3336,7 +3367,7 @@ const Player = () => {
                       className="h-full w-full object-contain"
                       draggable="false"
                     />
-                    {isDownloading && (
+                    {activeDownloadFormat === "flac" && isDownloading && (
                       <span className="absolute bottom-0 left-0 right-0 bg-black/80 px-0.5 text-center text-[9px] font-bold text-white tabular-nums">
                         {Math.round(downloadProgress)}%
                       </span>
@@ -3346,9 +3377,9 @@ const Player = () => {
                     type="button"
                     onClick={() => handleDownload("mp3")}
                     disabled={isDownloading}
-                    title={isDownloading ? `Downloading 320 kbps MP3: ${Math.round(downloadProgress)}%` : "Download 320 kbps MP3"}
+                    title={activeDownloadFormat === "mp3" ? `Downloading 320 kbps MP3: ${Math.round(downloadProgress)}%` : "Download 320 kbps MP3"}
                     aria-label="Download 320 kbps MP3 audio"
-                    className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:h-11 sm:w-11 transition-all hover:scale-105 hover:ring-2 hover:ring-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 ${isDownloading ? "animate-pulse ring-2 ring-cyan-400" : ""}`}
+                    className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg sm:h-11 sm:w-11 transition-all hover:scale-105 hover:ring-2 hover:ring-cyan-400 disabled:cursor-not-allowed disabled:opacity-50 ${activeDownloadFormat === "mp3" ? "animate-pulse ring-2 ring-cyan-400" : ""}`}
                   >
                     <img
                       src="/download-icons/mp3-320-download.png"
@@ -3356,7 +3387,7 @@ const Player = () => {
                       className="h-full w-full object-contain"
                       draggable="false"
                     />
-                    {isDownloading && (
+                    {activeDownloadFormat === "mp3" && isDownloading && (
                       <span className="absolute bottom-0 left-0 right-0 bg-black/80 px-0.5 text-center text-[9px] font-bold text-white tabular-nums">
                         {Math.round(downloadProgress)}%
                       </span>
@@ -3454,22 +3485,13 @@ const Player = () => {
                     </h3>
 
                     <div
-                      className="
-                        hidden
-                        gap-2
-                        lg:flex
-                      "
+                      className="flex shrink-0 items-center gap-1 sm:gap-2"
                     >
                       <button
                         type="button"
                         aria-label="Scroll suggestions left"
                         title="Previous suggestions"
-                        onClick={() =>
-                          scrollRef.current?.scrollBy({
-                            left: -500,
-                            behavior: "smooth",
-                          })
-                        }
+                        onClick={() => scrollSuggestions(-1)}
                         className="
                           rounded-full
                           p-2
@@ -3484,12 +3506,7 @@ const Player = () => {
                         type="button"
                         aria-label="Scroll suggestions right"
                         title="More suggestions"
-                        onClick={() =>
-                          scrollRef.current?.scrollBy({
-                            left: 500,
-                            behavior: "smooth",
-                          })
-                        }
+                        onClick={() => scrollSuggestions(1)}
                         className="
                           rounded-full
                           p-2
@@ -3510,21 +3527,26 @@ const Player = () => {
                       mt-3
                       flex
                       w-full
+                      min-w-0
+                      touch-pan-x
+                      overscroll-x-contain
                       snap-x
                       snap-mandatory
                       gap-3
                       overflow-x-auto
-                      overscroll-x-contain
+                      scroll-smooth
                       pb-3
                       [scrollbar-width:thin]
                     "
                   >
                     {suggestionList.map((item, index) => (
                       <div
-                        key={item?.id || item?.songId || item?.song_id || index}
+                        key={item?.id || item?.songId || item?.song_id || item?.trackId || index}
+                        data-suggestion-card
                         className="w-[148px] min-w-[148px] shrink-0 snap-start sm:w-[168px] sm:min-w-[168px]"
                       >
                         <SongGrid
+                          {...item}
                           song={item}
                           songs={suggestionList}
                         />
