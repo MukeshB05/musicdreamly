@@ -1,4 +1,4 @@
-const API_URL = "https://jiosaavndev.vercel.app/api/";
+const API_URL = "https://dreamly5api.vercel.app/api/";
 
 /*
 |--------------------------------------------------------------------------
