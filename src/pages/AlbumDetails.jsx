@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { FaHeart, FaRegHeart } from "react-icons/fa6";
+import { FaHeart, FaRegHeart, FaPlay } from "react-icons/fa6";
 import { IoShareSocial } from "react-icons/io5";
 import {
   MdOutlineKeyboardArrowLeft,
   MdOutlineKeyboardArrowRight,
 } from "react-icons/md";
 
+import MusicContext from "../context/MusicContext";
 import Navbar from "../components/Navbar";
 import SongsList from "../components/SongsList";
 import Footer from "../components/footer";
@@ -128,6 +129,8 @@ const RelatedArtistSection = ({ title, items }) => {
 
 const AlbumDetail = () => {
   const { id } = useParams();
+  const musicContext = useContext(MusicContext) || {};
+  const playMusic = musicContext.playMusic;
   const [album, setAlbum] = useState(null);
   const [songs, setSongs] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -276,6 +279,17 @@ const AlbumDetail = () => {
     window.dispatchEvent(new Event("favouritesUpdated"));
   }, [album, albumId, albumName, artists, cover, id]);
 
+  const playAlbum = useCallback(() => {
+    if (!songs.length || typeof playMusic !== "function") {
+      if (!songs.length) window.alert("No songs are available to play in this album.");
+      return;
+    }
+    const firstPlayableSong = songs.find((song) =>
+      song && (song.id || song.songId || song.song_id || song.url || song.downloadUrl)
+    ) || songs[0];
+    playMusic(firstPlayableSong, songs);
+  }, [songs, playMusic]);
+
   const shareAlbum = async () => {
     const url = `${window.location.origin}/albums/${encodeURIComponent(id || albumId)}`;
     try {
@@ -320,26 +334,29 @@ const AlbumDetail = () => {
     <>
       <Navbar />
       <main className="flex flex-col gap-8 px-3 pb-24 pt-28 lg:gap-10 lg:px-8 lg:pt-24">
-        <section className="flex items-center gap-4 sm:gap-7">
+        <section className="flex w-full flex-col items-center justify-center gap-5 py-3 text-center">
           <img
             src={cover}
             alt={albumName}
             onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = "/Unknown.png"; }}
-            className="h-28 w-28 shrink-0 rounded-xl object-cover shadow-xl sm:h-52 sm:w-52"
+            className="h-44 w-44 rounded-2xl object-cover shadow-2xl sm:h-60 sm:w-60"
           />
-          <div className="min-w-0">
-            <p className="mb-1 text-xs uppercase tracking-wider opacity-70">Album</p>
-            <h1 className="break-words text-xl font-bold sm:text-3xl">{albumName}</h1>
+          <div className="flex w-full max-w-2xl flex-col items-center">
+            <p className="mb-1 text-xs uppercase tracking-[0.2em] opacity-70">Album</p>
+            <h1 className="break-words text-2xl font-bold sm:text-4xl">{albumName}</h1>
             <p className="mt-2 text-sm opacity-80 sm:text-base">
               {album.songCount ?? songs.length} songs
               {primaryArtist?.name && <> · <Link className="hover:underline" to={primaryArtist.id ? `/artists/${primaryArtist.id}` : "#"}>{primaryArtist.name}</Link></>}
               {album.year ? ` · ${album.year}` : ""}
             </p>
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={toggleLikeAlbum} title={liked ? "Remove from favourites" : "Add to favourites"} aria-label={liked ? "Unlike album" : "Like album"} className="flex h-11 w-11 items-center justify-center rounded-full border border-current/20">
+            <div className="mt-5 flex items-center justify-center gap-4">
+              <button type="button" onClick={playAlbum} disabled={!songs.length} title="Play album" aria-label="Play album" className="flex h-14 items-center gap-2 rounded-full bg-green-500 px-7 font-semibold text-black transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50">
+                <FaPlay className="text-lg" /><span>Play</span>
+              </button>
+              <button type="button" onClick={toggleLikeAlbum} title={liked ? "Remove from favourites" : "Add to favourites"} aria-label={liked ? "Unlike album" : "Like album"} className="flex h-14 w-14 items-center justify-center rounded-full border border-current/30 transition hover:scale-105">
                 {liked ? <FaHeart className="text-xl text-red-500" /> : <FaRegHeart className="icon text-xl" />}
               </button>
-              <button type="button" onClick={shareAlbum} title="Share album" aria-label="Share album" className="flex h-11 w-11 items-center justify-center rounded-full border border-current/20">
+              <button type="button" onClick={shareAlbum} title="Share album" aria-label="Share album" className="flex h-14 w-14 items-center justify-center rounded-full border border-current/30 transition hover:scale-105">
                 <IoShareSocial className="icon text-xl" />
               </button>
             </div>
