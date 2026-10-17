@@ -43,6 +43,8 @@ import { toBlobURL } from "@ffmpeg/util";
 
 import MusicContext from "../context/MusicContext";
 
+import { fetchSyncedLyrics } from "../utils/lyrics";
+
 import ArtistItems from "./Items/ArtistItems";
 import SongGrid from "./SongGrid";
 
