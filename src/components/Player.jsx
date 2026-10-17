@@ -629,6 +629,32 @@ const getImage = (
 };
 
 /* =========================================================
+   NORMALIZE SUGGESTION API RESPONSES
+========================================================= */
+
+const extractSuggestionList = (response) => {
+  const candidates = [
+    response,
+    response?.data,
+    response?.results,
+    response?.songs,
+    response?.data?.results,
+    response?.data?.songs,
+    response?.data?.data,
+    response?.data?.data?.results,
+    response?.data?.data?.songs,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter((item) => item && typeof item === "object");
+    }
+  }
+
+  return [];
+};
+
+/* =========================================================
    SONG ID
 ========================================================= */
 
@@ -1273,16 +1299,8 @@ const Player = () => {
           const result =
             suggestionResult.value;
 
-          const data =
-            Array.isArray(result)
-              ? result
-              : result?.data;
-
-          setSuggestions(
-            Array.isArray(data)
-              ? data
-              : []
-          );
+          const data = extractSuggestionList(result);
+          setSuggestions(data);
         } else {
           setSuggestions([]);
         }
@@ -3159,7 +3177,7 @@ const Player = () => {
                   flex-nowrap
                   items-center
                   justify-start
-                  gap-1
+                  gap-2
                   overflow-x-auto
                   whitespace-nowrap
                   rounded-2xl
@@ -3303,7 +3321,7 @@ const Player = () => {
                   <IoShareSocial className="text-lg" />
                 </button>
 
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => handleDownload("flac")}
@@ -3444,14 +3462,13 @@ const Player = () => {
                     >
                       <button
                         type="button"
+                        aria-label="Scroll suggestions left"
+                        title="Previous suggestions"
                         onClick={() =>
-                          scrollRef.current?.scrollBy(
-                            {
-                              left: -500,
-                              behavior:
-                                "smooth",
-                            }
-                          )
+                          scrollRef.current?.scrollBy({
+                            left: -500,
+                            behavior: "smooth",
+                          })
                         }
                         className="
                           rounded-full
@@ -3465,14 +3482,13 @@ const Player = () => {
 
                       <button
                         type="button"
+                        aria-label="Scroll suggestions right"
+                        title="More suggestions"
                         onClick={() =>
-                          scrollRef.current?.scrollBy(
-                            {
-                              left: 500,
-                              behavior:
-                                "smooth",
-                            }
-                          )
+                          scrollRef.current?.scrollBy({
+                            left: 500,
+                            behavior: "smooth",
+                          })
                         }
                         className="
                           rounded-full
@@ -3493,26 +3509,27 @@ const Player = () => {
                     className="
                       mt-3
                       flex
+                      w-full
+                      snap-x
+                      snap-mandatory
                       gap-3
                       overflow-x-auto
-                      pb-2
+                      overscroll-x-contain
+                      pb-3
+                      [scrollbar-width:thin]
                     "
                   >
-                    {suggestionList.map(
-                      (
-                        item,
-                        index
-                      ) => (
+                    {suggestionList.map((item, index) => (
+                      <div
+                        key={item?.id || item?.songId || item?.song_id || index}
+                        className="w-[148px] min-w-[148px] shrink-0 snap-start sm:w-[168px] sm:min-w-[168px]"
+                      >
                         <SongGrid
-                          key={
-                            item?.id ||
-                            index
-                          }
                           song={item}
                           songs={suggestionList}
                         />
-                      )
-                    )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
