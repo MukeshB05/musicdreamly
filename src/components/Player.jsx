@@ -1295,7 +1295,7 @@ const Player = () => {
         // Each step is tried only if the previous one failed or returned nothing.
         let list = [];
         const sources = [
-          () => getSuggestionSong(songId, 20),
+          () => getSuggestionSong(songId, 60),
           () => getSongRecommendations(songId),
         ];
 
