@@ -162,7 +162,7 @@ export const getSongById = async (songId) => {
  */
 export const getSuggestionSong = async (
     songId,
-    limit = 20
+    limit = 60
 ) => {
 
     if (!songId) {
@@ -183,7 +183,7 @@ export const getSuggestionSong = async (
  */
 export const fetchSongSuggestionsByID = async (
     songId,
-    limit = 20
+    limit = 60
 ) => {
 
     if (!songId) {
@@ -357,7 +357,7 @@ export const fetchAlbumByID = async (
  * Get recommended songs for a language using reco.getreco.
  * The API accepts language codes such as "hindi", "english", or "tamil".
  */
-export const getReco = async (language, limit = 20) => {
+export const getReco = async (language, limit = 60) => {
     const normalizedLanguage = String(language ?? "").trim();
     if (!normalizedLanguage) {
         throw new Error("Language is required for song recommendations");
@@ -384,7 +384,7 @@ export const getSongRecommendations = async (songId) => {
 };
 
 /** Get trending/recommended albums for the same language. */
-export const getAlbumReco = async (language, limit = 20) => {
+export const getAlbumReco = async (language, limit = 60) => {
     const normalizedLanguage = String(language ?? "").trim();
     if (!normalizedLanguage) {
         throw new Error("Language is required for album recommendations");
@@ -399,7 +399,7 @@ export const getAlbumReco = async (language, limit = 20) => {
  * Get top albums released in a given year and language.
  * API endpoint: search.topAlbumsoftheYear
  */
-export const getTopAlbumsOfYear = async (year, language, limit = 20) => {
+export const getTopAlbumsOfYear = async (year, language, limit = 60) => {
     const normalizedYear = String(year ?? "").trim();
     const normalizedLanguage = String(language ?? "").trim();
     if (!/^\d{4}$/.test(normalizedYear)) {
