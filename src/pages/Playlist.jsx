@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Navigator from "../components/Navigator";
+import Footer from "../components/footer";
 import { genreData } from "../genreData";
 import { searchPlayListByQuery } from "../../fetch";
 import he from "he";
