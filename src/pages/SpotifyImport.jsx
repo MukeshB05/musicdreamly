@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 
 import Navigator from "../components/Navigator";
 import Navbar from "../components/Navbar";
+import Footer from "../components/footer";
 
 import MusicContext from "../context/MusicContext";
 
