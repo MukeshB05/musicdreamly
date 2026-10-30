@@ -480,7 +480,7 @@ const Navigator = () => {
             </button>
 
             <iframe
-              src="https://dreamplay.pages.dev/"
+              src="https://d5tv.pages.dev/"
               title="Dreamly5 Live TV"
               className="w-full h-full border-none"
               allowFullScreen
